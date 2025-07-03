@@ -115,7 +115,7 @@ class OpdmFunctional():  # testpragma: no cover
                 circuit = circuits[circuit_index]
                 if self.verbose:  # testpragma: no cover
                     print(circuit.to_text_diagram(transpose=True))
-                #data = self.sampler.run(circuit, repetitions=self.num_samples)
+                data = self.sampler.run(circuit, repetitions=self.num_samples)
                 #instead want to convert the circuit
 
                 #need to do something to get it to match to data
