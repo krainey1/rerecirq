@@ -15,11 +15,13 @@
 from typing import List, Optional
 import numpy as np
 import scipy as sp
+import pytket.extensions.cirq as tkc
 import cirq
 import recirq.hfvqe.circuits as ccc
 import recirq.hfvqe.analysis as cca
 import recirq.hfvqe.util as ccu
 from recirq.hfvqe.objective import rhf_params_to_matrix
+
 
 
 class RDMGenerator():  # testpragma: no cover
@@ -48,7 +50,7 @@ class OpdmFunctional():  # testpragma: no cover
                  one_body_integrals: np.ndarray,
                  two_body_integrals: np.ndarray,
                  num_electrons: int,
-                 num_samples: Optional[int] = 250_000,
+                 num_samples: Optional[int] = 25, #was 250000 shots, running smaller # for debugging
                  post_selection: Optional[bool] = True,
                  purification: Optional[bool] = True,
                  clean_xxyy: Optional[bool] = True,
@@ -76,6 +78,8 @@ class OpdmFunctional():  # testpragma: no cover
         self.clean_xxyy = clean_xxyy
 
     def calculate_data(self, parameters):
+        #qnexus project setup
+
         if len(parameters.shape) == 2:  # testpragma: no cover
             u = parameters
         else:
@@ -111,7 +115,10 @@ class OpdmFunctional():  # testpragma: no cover
                 circuit = circuits[circuit_index]
                 if self.verbose:  # testpragma: no cover
                     print(circuit.to_text_diagram(transpose=True))
-                data = self.sampler.run(circuit, repetitions=self.num_samples)
+                #data = self.sampler.run(circuit, repetitions=self.num_samples)
+                #instead want to convert the circuit
+
+                #need to do something to get it to match to data
                 if self.post_selection:
                     # PostSelect the data
                     good_indices = \
