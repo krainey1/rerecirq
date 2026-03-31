@@ -45,7 +45,7 @@ def get_matrix_of_eigs(w: np.ndarray) -> np.ndarray:
     return transform_eigs
 
 
-class RestrictedHartreeFockObjective():
+class RestrictedHartreeFockObjective(): #Restricted Hatrree-Fock Objective class 
     """Objective function for Restricted Hartree-Fock.
 
     The object transforms a variety of input types into the appropriate output.
@@ -53,16 +53,16 @@ class RestrictedHartreeFockObjective():
     knowledge of each type.
     """
 
-    def __init__(self, hamiltonian: InteractionOperator, num_electrons: int):
-        self.hamiltonian = hamiltonian
-        self.fermion_hamiltonian = get_fermion_operator(self.hamiltonian)
-        self.num_qubits = hamiltonian.one_body_tensor.shape[0]
-        self.num_orbitals = self.num_qubits // 2
-        self.num_electrons = num_electrons
-        self.nocc = self.num_electrons // 2
-        self.nvirt = self.num_orbitals - self.nocc
-        self.occ = list(range(self.nocc))
-        self.virt = list(range(self.nocc, self.nocc + self.nvirt))
+    def __init__(self, hamiltonian: InteractionOperator, num_electrons: int): #python constructor, for initializing the restricted objective object
+        self.hamiltonian = hamiltonian #grab the hamiltonian passed to the constructor - this will an InteractionOperator object, in which we have the molecular hamiltonian in the MO basis
+        self.fermion_hamiltonian = get_fermion_operator(self.hamiltonian) #takes the hamiltonian in the molecular basis and converts to fermionic (in FermionOperator) - src in OpenFermion
+        self.num_qubits = hamiltonian.one_body_tensor.shape[0] #hamiltonian.one_body_tensor -> 2d matrix h_pq store the the one-electron integrals, then using numpy shape we get (N, N) -> N is # of spin orbitals
+        self.num_orbitals = self.num_qubits // 2 #get the number of spatial orbitals (spin orbitals / 2) // is floor
+        self.num_electrons = num_electrons # total number of electrons
+        self.nocc = self.num_electrons // 2 #number of occupied orbitals
+        self.nvirt = self.num_orbitals - self.nocc #number of unoccupied (virtual) orbitals
+        self.occ = list(range(self.nocc)) #gives a list of occupied orbitals (allows for easy indexing)
+        self.virt = list(range(self.nocc, self.nocc + self.nvirt)) #gives a list of virtual orbitals (allows for easy indexing)
 
     def rdms_from_opdm_aa(self, opdm_aa) -> InteractionRDM:
         """Generate the RDM from just the alpha-alpha block.
@@ -171,29 +171,32 @@ class RestrictedHartreeFockObjective():
         return grad
 
 
-def generate_hamiltonian(one_body_integrals: np.ndarray,
-                         two_body_integrals: np.ndarray,
-                         constant: float,
-                         EQ_TOLERANCE: Optional[float] = 1.0E-12):
-    n_qubits = 2 * one_body_integrals.shape[0]
-    # Initialize Hamiltonian coefficients.
-    one_body_coefficients = np.zeros((n_qubits, n_qubits))
-    two_body_coefficients = np.zeros((n_qubits, n_qubits, n_qubits, n_qubits))
+#function/routine for generating the molecular hamiltonian as an InteractionOperator (needed for RestrictedHartreeFockObjective)
+def generate_hamiltonian(one_body_integrals: np.ndarray, #one body integrals, in numpy ndimensional array (kinetic + nuc attraction)
+                         two_body_integrals: np.ndarray, #two body integrals, in numpy ndimensional array (electron-electron repulsion)
+                         constant: float, #constant, nuc repulsion en
+                         EQ_TOLERANCE: Optional[float] = 1.0E-12): #a tolerance value, helps minimize errors
+    
+    n_qubits = 2 * one_body_integrals.shape[0] #number of qubits -> # of spin orbitals 2 * spatial orbitals
+    # Initialize Hamiltonian coefficients. -> Initializes arrays filled with zeros (spin orbital basis)
+    one_body_coefficients = np.zeros((n_qubits, n_qubits)) #2d matrix / 1d per spin orbital
+    two_body_coefficients = np.zeros((n_qubits, n_qubits, n_qubits, n_qubits)) #4d 
+    #np.zeros is just a short way to create arrays filled with zeros in numpy
     # Loop through integrals.
-    for p in range(n_qubits // 2):
+    for p in range(n_qubits // 2): #loops over pairs of spatial orbitals p and q 
         for q in range(n_qubits // 2):
 
             # Populate 1-body coefficients. Require p and q have same spin.
-            one_body_coefficients[2 * p, 2 * q] = one_body_integrals[p, q]
+            one_body_coefficients[2 * p, 2 * q] = one_body_integrals[p, q] #mapping spatial orbital integrals into spin orbital basis 2p (spin up index / alpha ) 2p + 1 (spin down index / beta)
             one_body_coefficients[2 * p + 1, 2 * q +
                                   1] = one_body_integrals[p, q]
             # Continue looping to prepare 2-body coefficients.
-            for r in range(n_qubits // 2):
+            for r in range(n_qubits // 2): #loop to all four spatial orbital indices p, q, r, s
                 for s in range(n_qubits // 2):
                     # Mixed spin
                     two_body_coefficients[2 * p, 2 * q + 1, 2 * r + 1, 2 *
                                           s] = (two_body_integrals[p, q, r, s] /
-                                                2.)
+                                                2.) #fills in mized spin terms /2 is to avoid double counting (2-body integral is symmetric)
                     two_body_coefficients[2 * p + 1, 2 * q, 2 * r, 2 * s +
                                           1] = (two_body_integrals[p, q, r, s] /
                                                 2.)
@@ -201,7 +204,7 @@ def generate_hamiltonian(one_body_integrals: np.ndarray,
                     # Same spin
                     two_body_coefficients[2 * p, 2 * q, 2 * r, 2 *
                                           s] = (two_body_integrals[p, q, r, s] /
-                                                2.)
+                                                2.) #fills in the same spin terms, again /2 to avoid double counting
                     two_body_coefficients[2 * p + 1, 2 * q + 1, 2 * r +
                                           1, 2 * s +
                                           1] = (two_body_integrals[p, q, r, s] /
@@ -209,11 +212,11 @@ def generate_hamiltonian(one_body_integrals: np.ndarray,
 
     # Truncate.
     one_body_coefficients[
-        np.absolute(one_body_coefficients) < EQ_TOLERANCE] = 0.
+        np.absolute(one_body_coefficients) < EQ_TOLERANCE] = 0. #sets all values below the tolerance threshold to 0, cleans up noise
     two_body_coefficients[
         np.absolute(two_body_coefficients) < EQ_TOLERANCE] = 0.
 
     # Cast to InteractionOperator class and return.
     molecular_hamiltonian = InteractionOperator(constant, one_body_coefficients,
-                                                two_body_coefficients)
+                                                two_body_coefficients) #InteractionOperator class in openfermion, at this point we have the full second quantized molecular hamiltonian (MO basis)
     return molecular_hamiltonian
