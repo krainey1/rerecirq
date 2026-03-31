@@ -75,20 +75,22 @@ def rhf_minimization(rhf_object, method='CG', initial_guess=None, verbose=True):
     """Perform Hartree-Fock energy minimization.
 
     Args:
-        rhf_object: RestrictedHartreeFockObject
-        method: scipy.optimize.minimize method
+        rhf_object: RestrictedHartreeFockObject we construct 
+        method: scipy.optimize.minimize method - > CG is conjugate gradient
+        initial_guess: defaults to none
+        verbose: printing progreess -> Truw
 
     Returns:
         Scipy optimize result
     """
-    _, energy, gradient = rhf_func_generator(rhf_object)
-    if initial_guess is None:
-        init_guess = np.zeros(rhf_object.nocc * rhf_object.nvirt)
+    _, energy, gradient = rhf_func_generator(rhf_object) #generates the energy, gradient, and unitary functions (we discard the unitary function)
+    if initial_guess is None: #checks if initial guess has not been specified
+        init_guess = np.zeros(rhf_object.nocc * rhf_object.nvirt) #defaults to all zeros (vector length nocc * nvirt) -> in RHF optimization paramerters are the orbital rotation angles between occupied and virtual orbitals
     else:
-        init_guess = initial_guess.flatten()
+        init_guess = initial_guess.flatten() #if we specify an initial guess .flatten() turns it into a 1d array
 
     return sp.optimize.minimize(energy,
                                 init_guess,
                                 jac=gradient,
                                 method=method,
-                                options={'disp': verbose})
+                                options={'disp': verbose}) #performs the energy minimization using scipy minimizer routine
