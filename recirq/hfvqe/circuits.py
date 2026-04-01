@@ -59,7 +59,7 @@ def rhf_params_to_matrix(parameters: np.ndarray,
     if occ is None:
         occ = range(num_qubits // 2)
     if virt is None:
-        virt = range(num_qubits // 2, num_qubits)
+        virt = range(num_qubits // 2, num_qubits) # 
 
     # check that parameters are a real array
     if not np.allclose(parameters.imag, 0):
@@ -73,12 +73,12 @@ def rhf_params_to_matrix(parameters: np.ndarray,
 
 
 def generate_circuits_from_params_or_u(
-        qubits: List[cirq.Qid],
-        parameters: np.ndarray,
-        nocc: int,
-        return_unitaries: Optional[bool] = False,
-        occ: Optional[Union[None, List[int]]] = None,
-        virt: Optional[Union[None, List[int]]] = None,
+        qubits: List[cirq.Qid], #our list of gridcubits we made earlier ~ qubit # = # spatial orbitals
+        parameters: np.ndarray, #unitary matrix u
+        nocc: int, #number of occupied orbitals
+        return_unitaries: Optional[bool] = False, #flag for whether or not to return unitaries
+        occ: Optional[Union[None, List[int]]] = None, #optional arg for occupied orbitals
+        virt: Optional[Union[None, List[int]]] = None, #optional arg for virt orbitals
         clean_ryxxy: Optional[bool] = False):  # testpragma: no cover
     """Make the circuits required for the estimation of the 1-RDM
 
@@ -93,39 +93,40 @@ def generate_circuits_from_params_or_u(
             Options are 1, 2, 3, 4.
     """
 
-    num_qubits = len(qubits)
+    num_qubits = len(qubits) #get qubit count -> spatial orbitals
     # determine if parameters is a unitary
     if len(parameters.shape) == 2:
         if parameters.shape[0] == parameters.shape[1]:
-            unitary = parameters
+            unitary = parameters #we are checking the shape here, if already a square 2d matrix we assume it is the unitary matrix
     else:
         generator = rhf_params_to_matrix(parameters,
                                          num_qubits,
                                          occ=occ,
-                                         virt=virt)
-        unitary = expm(generator)
+                                         virt=virt) #build kappa
+        unitary = expm(generator) #e^kappa
 
-    circuits = []
-    unitaries = []
-    for swap_depth in range(0, num_qubits, 2):
-        fswap_pairs = util.generate_fswap_pairs(swap_depth, num_qubits)
-        swap_unitaries = util.generate_fswap_unitaries(fswap_pairs, num_qubits)
-        shifted_unitary = unitary.copy()
-        for uu in swap_unitaries:
+    circuits = [] #empty list to collect circuit builds
+    unitaries = [] #empty list to collect unitaries
+    for swap_depth in range(0, num_qubits, 2): #loop increments by 2, 4 qubit H_2 -> 0, 2, 4
+        fswap_pairs = util.generate_fswap_pairs(swap_depth, num_qubits) #each depth gives a different permutation of qubit ordering -> we are building a swap network, generates pairs that will be (state) swapped at x depth
+        swap_unitaries = util.generate_fswap_unitaries(fswap_pairs, num_qubits) #converts pairs into unitary matrices (we are accounting for fermionic antisymmetry, -1 phase)
+        shifted_unitary = unitary.copy() #make a copy of the unitary
+        for uu in swap_unitaries: #for unitary in new pairs, left multiply with shifted_unitary -> composing permutation into orbital rotation
             shifted_unitary = uu @ shifted_unitary
-        unitaries.append(shifted_unitary)
-        matrix = shifted_unitary.T[:nocc, :]
+        unitaries.append(shifted_unitary) #store the shifted unitary in the list at current depth
+        matrix = shifted_unitary.T[:nocc, :] #transpose the shifted unitary, take first nocc (# occupied orbitals) rows -> the slater determinant matrix
 
-        permuted_circuit = cirq.Circuit()
+        permuted_circuit = cirq.Circuit() #create an empty cirq circuit
         permuted_circuit += prepare_slater_determinant(qubits,
                                                        matrix.real.copy(),
-                                                       clean_ryxxy=clean_ryxxy)
-        circuits.append(permuted_circuit)
+                                                       clean_ryxxy=clean_ryxxy) #composes our list of operations /gates, apply it to matrix
+        # prepare_slater_determinant -> decomposes the slater determinant matrix into a sequence of givens rotations -> prepares gates
+        circuits.append(permuted_circuit) #append circuit from list 
 
-    if return_unitaries:
+    if return_unitaries: #if this is marked True, return the unitary list 
         return circuits, unitaries
 
-    return circuits
+    return circuits #else return our circuits, we will append measurements in a later step
 
 
 def xxyy_basis_rotation(pairs, clean_xxyy=False):
