@@ -191,13 +191,18 @@ def prepare_slater_determinant(qubits: List[cirq.Qid],
         Generator for circuit
     """
     circuit_description = slater_determinant_preparation_circuit(
-        slater_determinant_matrix)
+        slater_determinant_matrix) #calls an OpenFermion method, decomposes nocc x n_spacial slater
+    # determinant matrix into givens rotations
     yield (cirq.X(qubits[j]) for j in range(slater_determinant_matrix.shape[0]))
-    for parallel_ops in circuit_description:
-        for op in parallel_ops:
-            i, j, theta, phi = op
+    #apply X (NOT) gates to first nocc (.shape[0]) qubits, 1 qubit per 1 orbital, initialize state
+    for parallel_ops in circuit_description: #iterating through layers of the circuit
+        for op in parallel_ops: 
+            i, j, theta, phi = op #unpack individual givens rotation into 2 qubits indice i, j
+            #rotation angle theta, phi is phase
             if not np.isclose(phi, 0):  # testpragma: no cover
                 raise ValueError("unitary must be real valued only")
+            #checks to see if phi is nonzero, suggests complex phases in the unitary (RHF -> real)
+            #the following selects which gate implementation to use for the givens rotation
             if clean_ryxxy is True or clean_ryxxy == 1:
                 yield ryxxy(qubits[i], qubits[j], theta)
             elif clean_ryxxy == 2:
@@ -209,6 +214,7 @@ def prepare_slater_determinant(qubits: List[cirq.Qid],
             else:
                 raise ValueError("Invalide clean_ryxxy value")
 
+#yield keyword -> creates generator functions -> pauses execution, returns a value to the caller, resume from that point
 
 def ryxxy(a, b, theta):
     """Implements the givens rotation with sqrt(iswap).
