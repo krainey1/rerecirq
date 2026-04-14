@@ -130,17 +130,17 @@ def generate_circuits_from_params_or_u(
 
 
 def xxyy_basis_rotation(pairs, clean_xxyy=False):
-    """Generate the measurement circuits."""
-    all_ops = []
+    """Generate the measurement circuits for the basis rotation"""
+    all_ops = [] #empty list for gate ops
 
     for a, b in pairs:
         if clean_xxyy:
             all_ops += [
-                cirq.rz(-np.pi * 0.25).on(a),
-                cirq.rz(np.pi * 0.25).on(b),
-                cirq.ISWAP.on(a, b)**0.5
+                cirq.rz(-np.pi * 0.25).on(a), #rotate qubit a's phase 
+                cirq.rz(np.pi * 0.25).on(b), #rotate qubit b's phase 
+                cirq.ISWAP.on(a, b)**0.5 #apply parital swap to complete basis rotation (maps to Z so XY can be measured)
             ]
-        else:
+        else: #we ignore this part this is for google hardware
             all_ops += [
                 cirq.rz(-np.pi * 0.25).on(a),
                 cirq.rz(np.pi * 0.25).on(b),
@@ -153,27 +153,27 @@ def circuits_with_measurements(qubits, circuits,
                                clean_xxyy=False):  # testpragma: no cover
     """Append the appropriate measurements to each of the permutation circuits.
     """
-    num_qubits = len(qubits)
+    num_qubits = len(qubits) #our number of qubits, # of spatial orbitals/basis functions(depends on basis set)
     even_pairs = [
         qubits[idx:idx + 2] for idx in np.arange(0, num_qubits - 1, 2)
-    ]
-    odd_pairs = [qubits[idx:idx + 2] for idx in np.arange(1, num_qubits - 1, 2)]
-    measure_labels = ['z', 'xy_even', 'xy_odd']
-    all_circuits_with_measurements = {label: {} for label in measure_labels}
-    for circuit_index in range(len(circuits)):
-        for _, label in enumerate(measure_labels):
-            circuit = deepcopy(circuits[circuit_index])
-            if label == 'xy_even':
+    ] #collects the even neighboring pairs starting from 0 -> for H_2 [[q0,q1], [q2,q3], [q4,q5]]
+    odd_pairs = [qubits[idx:idx + 2] for idx in np.arange(1, num_qubits - 1, 2)] #odd numbered pairs starting from 1 [[q1,q2], [q3,q4]]
+    measure_labels = ['z', 'xy_even', 'xy_odd'] #measurement types, z is the standard measurement for orbital occupancy, xy_even measures even pairs in xy basis after basis rotation, xy_odd for measuring odd pairs
+    all_circuits_with_measurements = {label: {} for label in measure_labels} #initializes an nested empty dict, outer keys being measurement labels, inner keys circuit indices 
+    for circuit_index in range(len(circuits)): #loops over the number of permuted circuits
+        for _, label in enumerate(measure_labels): #loop over each measurement label
+            circuit = deepcopy(circuits[circuit_index]) #make a strict copy, important otherwise you would be messing with the same circuit in memory
+            if label == 'xy_even': #if this is an xy_even measurement
                 circuit.append(xxyy_basis_rotation(even_pairs,
                                                    clean_xxyy=clean_xxyy),
-                               strategy=cirq.InsertStrategy.EARLIEST)
+                               strategy=cirq.InsertStrategy.EARLIEST) #append rotation basis gate as early in the circuit as possible (strategy)
             if label == 'xy_odd':
                 circuit.append(xxyy_basis_rotation(odd_pairs,
                                                    clean_xxyy=clean_xxyy),
-                               strategy=cirq.InsertStrategy.EARLIEST)
-            circuit.append(cirq.Moment([cirq.measure(q) for q in qubits]))
-            all_circuits_with_measurements[label][circuit_index] = circuit
-    return all_circuits_with_measurements
+                               strategy=cirq.InsertStrategy.EARLIEST) #append rotation basis gate as early in the circuit as possible (strategy)
+            circuit.append(cirq.Moment([cirq.measure(q) for q in qubits])) #append measurement gates to circuits, moment means we do this step at the same time
+            all_circuits_with_measurements[label][circuit_index] = circuit #stores the circuit under its label and index
+    return all_circuits_with_measurements #return the nested dictionary of circuits
 
 
 def prepare_slater_determinant(qubits: List[cirq.Qid],
