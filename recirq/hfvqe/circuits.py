@@ -216,16 +216,22 @@ def prepare_slater_determinant(qubits: List[cirq.Qid],
 
 #yield keyword -> creates generator functions -> pauses execution, returns a value to the caller, resume from that point
 
+"""
+We use the idealized circuit implementation (ryxxy -> seq of pauli operations to implement the givens rotation)
+"""
+
 def ryxxy(a, b, theta):
     """Implements the givens rotation with sqrt(iswap).
     The inverse(sqrt(iswap)) is made with z before and after"""
-    yield cirq.ISWAP.on(a, b)**0.5
-    yield cirq.rz(-theta + np.pi).on(a)
-    yield cirq.rz(theta).on(b)
-    yield cirq.ISWAP.on(a, b)**0.5
-    yield cirq.rz(np.pi).on(a)
+    yield cirq.ISWAP.on(a, b)**0.5 #ISWAP ~ partially swaps two qubit states while adding a phase factor
+    yield cirq.rz(-theta + np.pi).on(a) #rotates the phase of qubit a's component by theta, how much the orbital a mixes into the rotation
+    yield cirq.rz(theta).on(b) #rotates the phase of qubit b's component by theta
+    yield cirq.ISWAP.on(a, b)**0.5  #applies the partial swap again, resolving entanglement -> the interference between the a and b components implements the actual orbital mixing
+    yield cirq.rz(np.pi).on(a) #phase rotation to clean up residual phase
 
-
+"""
+the following circuit contructions below we don't use, they are for google hardware error correction, and do a simimlar strategy
+"""
 def ryxxy2(a, b, theta):
     """
     Implement realistic Givens rotation considering the always on parasitic
